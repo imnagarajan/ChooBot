@@ -25,7 +25,7 @@ namespace DiscordApp
 		public override string Name => "DiscordPlugin";
 		public override string Description => "";
 		public override Version Version => Assembly.GetExecutingAssembly().GetName().Version;
-
+	
 		public override void Initialize()
 		{
 			if (!Directory.Exists(SavePath))
@@ -40,15 +40,60 @@ namespace DiscordApp
 				config.Save();
 			}
 
-			discordBot = new DiscordBot(config.ServerId, config.ChatChannelId, config.LogChannelId);
-
-			Task.Run(action: async () =>
+			Task.Run(async () =>
 			{
-				await discordBot.Connect(config.BotEmail, config.BotPassword);			
-			});		
-
+				await StartBot();
+			});
+	
 			Commands.InitCommands(isPlugin);
+
+			TShockAPI.Commands.ChatCommands.Add(new TShockAPI.Command("choobot.manage",Bot, "bot"));
+
 			ServerApi.Hooks.ServerChat.Register(this, OnChat);
+		}
+
+		static void Bot(TShockAPI.CommandArgs args)
+		{
+			string option = args.Parameters.Count == 0 ? "help" : args.Parameters[0].ToLower();
+
+			switch (option)
+			{
+				case "enable":
+					DiscordPlugin.discordBot.Enabled = true;
+					args.Player.SendInfoMessage($"ChooBot is now enabled.");
+					
+					break;
+				case "disable":
+					DiscordPlugin.discordBot.Enabled = false;
+					args.Player.SendInfoMessage($"ChooBot is now disabled.");
+					break;
+				case "restart":
+					args.Player.SendInfoMessage("Restarting ChooBot...");
+					Task.Run(async () =>
+					{
+						await DiscordPlugin.StartBot();
+					}).ContinueWith((o) =>
+					{
+						args.Player.SendInfoMessage("ChooBot restarted successfully.");
+					});
+					break;
+				case "help":
+				default:
+					args.Player.SendInfoMessage($"Invalid syntax! proper syntax: {TShockAPI.Commands.Specifier}bot [enable|disable|restart]");
+					break;
+			}
+		}
+
+		public static async Task StartBot()
+		{
+			if (discordBot != null)
+			{
+				discordBot.Dispose();
+				discordBot = null;
+			}
+
+			discordBot = new DiscordBot(config.ServerId, config.ChatChannelId, config.LogChannelId);
+			await discordBot.Connect(config.BotEmail, config.BotPassword);			
 		}
 
 		protected override void Dispose(bool disposing)
@@ -99,9 +144,8 @@ namespace DiscordApp
 		}
 	}
 
-	public class DiscordBot
+	public class DiscordBot : IDisposable
 	{
-
 		public DiscordBot(ulong ServerId, ulong ChatChannelId, ulong LogChannelId)
 		{
 			this.ServerId = ServerId;
@@ -109,6 +153,7 @@ namespace DiscordApp
 			this.LogChannelId = LogChannelId;	
 		}
 
+		public bool Enabled { get; set; } = true;
 		public DiscordClient Client { get; set; }
 		public ulong ServerId { get; private set; }
 		public ulong ChatChannelId { get; private set; }
@@ -118,7 +163,6 @@ namespace DiscordApp
 		{
 			Client = new DiscordClient();
 			
-
 			await Client.Connect(username, password).ContinueWith((o)=> 
 			{
 				Client.MessageReceived += Client_MessageReceived;
@@ -136,85 +180,34 @@ namespace DiscordApp
 #endif
 			if (e.Message.Text.StartsWith(Commands.Specifier) && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
 			{
+				if (!Enabled && e.Message.Text.Substring(1, 3).ToLower() != "bot")
+					return;
 				Commands.HandleCommand(e, e.Message.Text);
+				return;
 			}
-
-			else if (e.Channel.Id ==  ChatChannelId && DiscordPlugin.isPlugin)
+			if (e.Channel.Id == ChatChannelId && DiscordPlugin.isPlugin && Enabled)
 			{
 				if (e.Message.Text.Length > 500)
 				{
 					e.Message.Delete();
 					return;
 				}
-				for (int i = 0; i < TShock.Players.Length; i++)
-					TShock.Players[i].SendMessage($"[Discord] {e.Message}", new Color(242, 44, 196));
+				TShock.Utils.Broadcast($"[Discord] {e.Message}", new Color(242, 44, 196));
 			}
 		}
 
 		public async Task SendMessage(ulong channelId, string message)
 		{
+			if (!Enabled)
+				return;
+
 			await Client.GetServer(ServerId).GetChannel(channelId).SendMessage(message);
 		}
 
-		~DiscordBot()
+		public void Dispose()
 		{
 			Client.MessageReceived -= Client_MessageReceived;
+			Client = null;
 		}
 	}
-
-	/*public class DiscordBot
-	{
-		public bool isPlugin { get; set; }
-		public bool isConnected { get; set; }
-		//static void Main(string[] args) => new DiscordBot().Start();
-
-		public static DiscordClient _client;
-		public static Server TerraPix => _client.GetServer(121262275423240192);
-		public static  Channel LogChannel => TerraPix.GetChannel(189795004636594176);
-		public static ulong LobbyId => 189813404247130112;
-		public static Channel ServerChannel => TerraPix.GetChannel(LobbyId);
-
-		public void Start()
-		{
-			Commands.InitCommands();
-
-			_client = new DiscordClient();
-
-			_client.MessageReceived +=  (s, e) =>
-			{			
-				if (e.Message.IsAuthor)
-					return;
-
-				if (e.Message.Text.StartsWith(Commands.Specifier) && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
-				{
-					Commands.HandleCommand(e, e.Message.Text);
-				}
-				
-				else if (e.Channel.Id == LobbyId && isPlugin)
-				{					
-					if (e.Message.Text.Length > 500)
-					{
-						e.Message.Delete();
-						return;
-					}
-					for (int i = 0; i < TShock.Players.Length; i++)
-						TShock.Players[i].SendMessage($"[Discord] {e.Message}", new Color(242,44,196));					
-				}
-			};
-
-			_client.ExecuteAndWait(async () =>
-			{
-				await _client.Connect("bot@terrapix.ca", "poopbot123").ContinueWith((e) => 
-				{
-					isConnected = true;
-					Console.WriteLine("Bot connected to server.");
-				});				
-			});		
-		}
-
-		public static void Log(string msg)
-		{
-			LogChannel.SendMessage(msg);
-		}
-	}*/
 }

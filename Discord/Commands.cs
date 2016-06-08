@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace DiscordApp
 {
@@ -19,12 +20,10 @@ namespace DiscordApp
 			Action<Command> add = (cmd) =>
 			{
 				if (!cmd.RequireIsPlugin || isPlugin)
-				{
-					Console.WriteLine(cmd.Name);
 					ChatCommands.Add(cmd);
-				}
 			};
 
+			#region AddCommands
 			add(new Command(Help, "help") { HelpText = "displays a list of commands" });
 			add(new Command(Rnd, "rnd")
 			{
@@ -33,17 +32,74 @@ namespace DiscordApp
 				{
 					$"{Specifier}rnd - generates a number between 0 and {int.MaxValue -1}",
 					$"{Specifier}rnd <high> - generates a number between 0 and 'high'",
-					$"{Specifier}rnd <low> <high> - generates a number between 'low' and 'high'"									
+					$"{Specifier}rnd <low> <high> - generates a number between 'low' and 'high'"
 				}
+			});
+			add(new Command(Bot, "bot")
+			{
+				HelpText = "Bot admin commands",
+				CmdInfo = new List<string>
+				{
+					$"{Specifier}bot [enable|disable|restart]"
+				}
+			});
+			add(new Command(Ping, "ping")
+			{
+				HelpText = "Ping ChooBot to see if he is still alive."
 			});
 			add(new Command(Login, "login")
 			{
 				RequireIsPlugin = true
 			});
+			#endregion AddCommands
+		}
+
+		#region Commands
+		static void Ping(CommandArgs args)
+		{	
+			args.msgEventArgs.Channel.SendMessage("pong");
+		}
+
+		static void Bot(CommandArgs args)
+		{
+			if (!args.msgEventArgs.User.ServerPermissions.ManageChannels)
+			{
+				args.msgEventArgs.Channel.SendMessage($"{args.msgEventArgs.User.Name} does not have permission to use {Specifier}bot");
+				return;
+			}
+			string option = args.Parameters.Count == 0 ? "help" : args.Parameters[0].ToLower();
+
+			switch (option)
+			{
+				case "enable":
+					DiscordPlugin.discordBot.Enabled = true;
+					args.msgEventArgs.Channel.SendMessage($"ChooBot is now enabled.");
+					break;
+				case "disable":
+					DiscordPlugin.discordBot.Enabled = false;
+					args.msgEventArgs.Channel.SendMessage($"ChooBot is now disabled.");
+					break;
+				case "restart":
+					ulong channelId = args.msgEventArgs.Channel.Id;
+					args.msgEventArgs.Channel.SendMessage("Restarting ChooBot...");
+					Task.Run(async () =>
+					{
+						await DiscordPlugin.StartBot();
+					}).ContinueWith(async (o) => 
+					{
+						await DiscordPlugin.discordBot.SendMessage(channelId, "ChooBot restarted successfully.");
+					});					
+					break;
+				case "help":
+				default:
+					args.msgEventArgs.Channel.SendMessage($"Invalid syntax! proper syntax: {Specifier}bot [enable|disable|restart]");
+					break;
+			}
 		}
 
 		static void Help(CommandArgs args)
 		{
+			Console.WriteLine("poop");
 			if (args.Parameters.Count == 1)
 			{
 				Command cmd = ChatCommands.Find(c => c.Name == args.Parameters[0]);
@@ -53,7 +109,7 @@ namespace DiscordApp
 						args.msgEventArgs.Channel.SendMessage($"{Specifier}{cmd.Name}:\n{string.Join("\n", cmd.CmdInfo)}");
 					else
 						args.msgEventArgs.Channel.SendMessage($"No extra help available for {Specifier}{cmd.Name}");
-                    return;
+					return;
 				}
 			}
 			List<string> cmdhelp = new List<string>();
@@ -98,6 +154,7 @@ namespace DiscordApp
 				return;
 			}
 		}
+		#endregion Commands
 
 		public static bool HandleCommand(MessageEventArgs e, string text)
 		{
@@ -127,6 +184,7 @@ namespace DiscordApp
 				else
 				{
 					DiscordPlugin.Log($"{e.User.Name} executed: {Specifier}{cmdText}");
+					cmd.Run(cmdText, e, args);
 				}
 			}
 			return true;
