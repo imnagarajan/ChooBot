@@ -25,12 +25,26 @@ namespace DiscordApp
 		public override string Name => "DiscordPlugin";
 		public override string Description => "";
 		public override Version Version => Assembly.GetExecutingAssembly().GetName().Version;
-	
+
+		public static Dictionary<ulong, TSPlayer> LoggdedInUsers { get; set; }
+
+		private static int _userId=-2;	
+			
+		public static int UserId
+		{
+			get
+			{
+				if (_userId <= int.MinValue)
+					_userId = -2;
+				return _userId--;
+			}
+		}
+
 		public override void Initialize()
 		{
 			if (!Directory.Exists(SavePath))
 				Directory.CreateDirectory(SavePath);
-			
+
 
 			if (File.Exists(Config.SavePath))
 				config = Config.Load();
@@ -44,10 +58,12 @@ namespace DiscordApp
 			{
 				await StartBot();
 			});
-	
+
+			LoggdedInUsers = new Dictionary<ulong, TSPlayer>();
+
 			Commands.InitCommands(isPlugin);
 
-			TShockAPI.Commands.ChatCommands.Add(new TShockAPI.Command("choobot.manage",Bot, "bot"));
+			TShockAPI.Commands.ChatCommands.Add(new TShockAPI.Command("choobot.manage", Bot, "bot"));
 
 			ServerApi.Hooks.ServerChat.Register(this, OnChat);
 		}
@@ -61,7 +77,7 @@ namespace DiscordApp
 				case "enable":
 					DiscordPlugin.discordBot.Enabled = true;
 					args.Player.SendInfoMessage($"ChooBot is now enabled.");
-					
+
 					break;
 				case "disable":
 					DiscordPlugin.discordBot.Enabled = false;
@@ -77,9 +93,13 @@ namespace DiscordApp
 						args.Player.SendInfoMessage("ChooBot restarted successfully.");
 					});
 					break;
+				case "reloadconfig":
+					DiscordPlugin.config = Config.Load();
+					args.Player.SendInfoMessage($"Config file has been reloaded.");
+					break;
 				case "help":
 				default:
-					args.Player.SendInfoMessage($"Invalid syntax! proper syntax: {TShockAPI.Commands.Specifier}bot [enable|disable|restart]");
+					args.Player.SendInfoMessage($"Invalid syntax! proper syntax: {TShockAPI.Commands.Specifier}bot [enable|disable|restart|reloadconfig]");
 					break;
 			}
 		}
@@ -91,9 +111,8 @@ namespace DiscordApp
 				discordBot.Dispose();
 				discordBot = null;
 			}
-
 			discordBot = new DiscordBot(config.ServerId, config.ChatChannelId, config.LogChannelId);
-			await discordBot.Connect(config.BotEmail, config.BotPassword);			
+			await discordBot.Connect(config.BotEmail, config.BotPassword);
 		}
 
 		protected override void Dispose(bool disposing)
@@ -150,7 +169,7 @@ namespace DiscordApp
 		{
 			this.ServerId = ServerId;
 			this.ChatChannelId = ChatChannelId;
-			this.LogChannelId = LogChannelId;	
+			this.LogChannelId = LogChannelId;
 		}
 
 		public bool Enabled { get; set; } = true;
@@ -158,12 +177,13 @@ namespace DiscordApp
 		public ulong ServerId { get; private set; }
 		public ulong ChatChannelId { get; private set; }
 		public ulong LogChannelId { get; private set; }
+		
 
 		public async Task Connect(string username, string password)
 		{
 			Client = new DiscordClient();
-			
-			await Client.Connect(username, password).ContinueWith((o)=> 
+
+			await Client.Connect(username, password).ContinueWith((o) =>
 			{
 				Client.MessageReceived += Client_MessageReceived;
 				Console.WriteLine("Bot connected to server.");
@@ -176,8 +196,28 @@ namespace DiscordApp
 				return;
 
 #if DEBUG
-				Console.WriteLine(e.Message);
+			Console.WriteLine(e.Message);
 #endif
+			if (e.Message.Text.StartsWith(".") && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
+			{
+				return;
+				if (DiscordPlugin.LoggdedInUsers.ContainsKey(e.User.Id))
+				{
+					TSPlayer ts;
+
+					if (DiscordPlugin.LoggdedInUsers.TryGetValue(e.User.Id, out ts))
+					{
+						Console.WriteLine("tryhandle..");
+						bool success = Commands.HandleTShockCommand(ts, e.Message.Text);
+#if DEBUG
+						Console.WriteLine($"Command executed {(success ? "" : "un")}successfully");
+#endif
+					}
+				}
+				else
+					e.Channel.SendMessage($"You are not logged in!\nPlease private message ChooBot with {Commands.Specifier}login <username> <password> to use TShock commands.");
+				return;
+			}
 			if (e.Message.Text.StartsWith(Commands.Specifier) && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
 			{
 				if (!Enabled && e.Message.Text.Substring(1, 3).ToLower() != "bot")
@@ -192,7 +232,8 @@ namespace DiscordApp
 					e.Message.Delete();
 					return;
 				}
-				TShock.Utils.Broadcast($"[Discord] {e.Message}", new Color(242, 44, 196));
+				
+				TShock.Utils.Broadcast($"[Discord] {e.Message}", DiscordPlugin.config.ChatColor.toColor());
 			}
 		}
 

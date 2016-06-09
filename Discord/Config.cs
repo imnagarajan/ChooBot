@@ -12,11 +12,13 @@ namespace DiscordApp
 		public ulong ServerId;
 		public ulong ChatChannelId;
 		public ulong LogChannelId;
+		public ChatColor ChatColor;
 
 		public Config()
 		{
 			BotEmail = "mail@domain.tld";
 			BotPassword = "password";
+			ChatColor = new ChatColor(33, 181, 20);
 		}
 
 		public void Save()

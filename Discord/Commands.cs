@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TShockAPI;
 
 namespace DiscordApp
 {
@@ -40,7 +41,7 @@ namespace DiscordApp
 				HelpText = "Bot admin commands",
 				CmdInfo = new List<string>
 				{
-					$"{Specifier}bot [enable|disable|restart]"
+					$"{Specifier}bot [enable|disable|restart|reloadconfig]"
 				}
 			});
 			add(new Command(Ping, "ping")
@@ -56,7 +57,7 @@ namespace DiscordApp
 
 		#region Commands
 		static void Ping(CommandArgs args)
-		{	
+		{
 			args.msgEventArgs.Channel.SendMessage("pong");
 		}
 
@@ -85,21 +86,24 @@ namespace DiscordApp
 					Task.Run(async () =>
 					{
 						await DiscordPlugin.StartBot();
-					}).ContinueWith(async (o) => 
+					}).ContinueWith(async (o) =>
 					{
 						await DiscordPlugin.discordBot.SendMessage(channelId, "ChooBot restarted successfully.");
-					});					
+					});
+					break;
+				case "reloadconfig":
+					DiscordPlugin.config = Config.Load();
+					args.msgEventArgs.Channel.SendMessage($"Config file has been reloaded.");
 					break;
 				case "help":
 				default:
-					args.msgEventArgs.Channel.SendMessage($"Invalid syntax! proper syntax: {Specifier}bot [enable|disable|restart]");
+					args.msgEventArgs.Channel.SendMessage($"Invalid syntax! proper syntax: {Specifier}bot [enable|disable|restart|reloadconfig]");
 					break;
 			}
 		}
 
 		static void Help(CommandArgs args)
 		{
-			Console.WriteLine("poop");
 			if (args.Parameters.Count == 1)
 			{
 				Command cmd = ChatCommands.Find(c => c.Name == args.Parameters[0]);
@@ -122,8 +126,8 @@ namespace DiscordApp
 
 		static void Rnd(CommandArgs args)
 		{
-			int low=0;
-			int high=0;
+			int low = 0;
+			int high = 0;
 			int rnd = 0;
 			if (args.Parameters.Count == 1)
 			{
@@ -147,14 +151,81 @@ namespace DiscordApp
 
 		static void Login(CommandArgs args)
 		{
-			if(!args.msgEventArgs.Channel.IsPrivate)
+			args.msgEventArgs.Message.Delete();
+			if (args.Parameters.Count != 2)
 			{
-				args.msgEventArgs.Message.Delete();
+				args.msgEventArgs.Channel.SendMessage($"Invalid syntax! Proper syntax: {Specifier}login <username> <password>");
+				return;
+			}
+			if (!args.msgEventArgs.Channel.IsPrivate)
+			{
 				args.msgEventArgs.Channel.SendMessage($"Only use {Specifier}login in private message you fool!");
 				return;
 			}
+			TShockAPI.DB.User user = TShock.Users.GetUserByName(args.Parameters[0]);
+			if (user != null && user.VerifyPassword(args.Parameters[1]))
+			{
+				Group g = TShock.Groups.GetGroupByName(user.Group);
+				TSPlayer ts = new TSPlayer(DiscordPlugin.UserId) { User = user, Group = g };
+				if (DiscordPlugin.LoggdedInUsers.ContainsKey(args.msgEventArgs.User.Id))
+					DiscordPlugin.LoggdedInUsers.Remove(args.msgEventArgs.User.Id);
+				DiscordPlugin.LoggdedInUsers.Add(args.msgEventArgs.User.Id, ts);
+				args.msgEventArgs.Channel.SendMessage("Logged in successfully!");				
+			}
+			else
+				args.msgEventArgs.Channel.SendMessage("Invalid username or password!");
 		}
 		#endregion Commands
+
+		public static bool HandleTShockCommand(TSPlayer player, string text)
+		{
+			string cmdText = text.Remove(0, 1);
+			string cmdPrefix = text[0].ToString();
+			bool silent = false;
+
+			if (cmdPrefix == TShockAPI.Commands.SilentSpecifier)
+				silent = true;
+
+			var args = ParseParameters(cmdText);
+			if (args.Count < 1)
+				return false;
+
+			string cmdName = args[0].ToLower();
+			args.RemoveAt(0);
+
+			IEnumerable<TShockAPI.Command> cmds = TShockAPI.Commands.ChatCommands.FindAll(c => c.HasAlias(cmdName));
+			Console.WriteLine("Check 1");
+			if (cmds.Count() == 0)
+			{
+
+				//player.SendErrorMessage("Invalid command entered. Type {0}help for a list of valid commands.", Specifier);
+				return true;
+			}
+			
+			Console.WriteLine("Check 2");
+			foreach (TShockAPI.Command cmd in cmds)
+			{
+				if (!cmd.CanRun(player))
+				{
+					Console.WriteLine("Check 3");
+					TShock.Utils.SendLogs(string.Format("{0} tried to execute {1}{2}.", player.Name, Specifier, cmdText), Color.PaleVioletRed, player);
+					player.SendErrorMessage("You do not have access to this command.");
+				}
+				else if (!cmd.AllowServer && !player.RealPlayer)
+				{
+					Console.WriteLine("Check 4");
+					player.SendErrorMessage("You must use this command in-game.");
+				}
+				else
+				{
+					Console.WriteLine("Check 5");
+					if (cmd.DoLog)
+						TShock.Utils.SendLogs(string.Format("{0} executed: {1}{2}.", player.Name, silent ? TShockAPI.Commands.SilentSpecifier : TShockAPI.Commands.Specifier, cmdText), Color.PaleVioletRed, player);
+					cmd.Run(cmdText, silent, player, args);
+				}
+			}
+			return true;
+		}
 
 		public static bool HandleCommand(MessageEventArgs e, string text)
 		{
@@ -167,7 +238,7 @@ namespace DiscordApp
 
 			string cmdName = args[0].ToLower();
 			args.RemoveAt(0);
-		
+
 			IEnumerable<Command> cmds = ChatCommands.FindAll(c => c.Name == cmdName);
 
 			if (cmds.Count() == 0)
@@ -279,7 +350,7 @@ namespace DiscordApp
 			Name = name;
 		}
 
-		public bool Run(string msg, MessageEventArgs e,List<string> parms)
+		public bool Run(string msg, MessageEventArgs e, List<string> parms)
 		{
 			if (!CanRun(e))
 				return false;
