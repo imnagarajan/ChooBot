@@ -7,8 +7,7 @@ namespace DiscordApp
 	public class Config
 	{
 		public static string SavePath => Path.Combine(DiscordPlugin.SavePath, "config.json");
-		public string BotEmail;
-		public string BotPassword;
+		public string BotToken;
 		public ulong ServerId;
 		public ulong ChatChannelId;
 		public ulong LogChannelId;
@@ -16,8 +15,7 @@ namespace DiscordApp
 
 		public Config()
 		{
-			BotEmail = "mail@domain.tld";
-			BotPassword = "password";
+			BotToken = "";
 			ChatColor = new ChatColor(33, 181, 20);
 		}
 

@@ -66,6 +66,24 @@ namespace DiscordApp
 			TShockAPI.Commands.ChatCommands.Add(new TShockAPI.Command("choobot.manage", Bot, "bot"));
 
 			ServerApi.Hooks.ServerChat.Register(this, OnChat);
+			ServerApi.Hooks.ServerJoin.Register(this, OnJoin);
+			ServerApi.Hooks.ServerLeave.Register(this, OnLeave);
+		}
+
+		void OnJoin(JoinEventArgs e)
+		{
+			Task.Run(async () =>
+			{
+				await discordBot.SendMessage(config.ChatChannelId, $"***{TShock.Players[e.Who].Name} has joined.***");
+			});
+        }
+
+		void OnLeave(LeaveEventArgs e)
+		{
+			Task.Run(async () =>
+			{
+				await discordBot.SendMessage(config.ChatChannelId, $"***{TShock.Players[e.Who].Name} has left.***");
+			});
 		}
 
 		static void Bot(TShockAPI.CommandArgs args)
@@ -112,7 +130,7 @@ namespace DiscordApp
 				discordBot = null;
 			}
 			discordBot = new DiscordBot(config.ServerId, config.ChatChannelId, config.LogChannelId);
-			await discordBot.Connect(config.BotEmail, config.BotPassword);
+			await discordBot.Connect(config.BotToken);			
 		}
 
 		protected override void Dispose(bool disposing)
@@ -179,11 +197,11 @@ namespace DiscordApp
 		public ulong LogChannelId { get; private set; }
 		
 
-		public async Task Connect(string username, string password)
+		public async Task Connect(string token)
 		{
 			Client = new DiscordClient();
 
-			await Client.Connect(username, password).ContinueWith((o) =>
+			await Client.Connect(token).ContinueWith((o) =>
 			{
 				Client.MessageReceived += Client_MessageReceived;
 				Console.WriteLine("Bot connected to server.");
