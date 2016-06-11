@@ -52,20 +52,31 @@ namespace DiscordApp
 			{
 				RequireIsPlugin = true
 			});
+			add(new Command(Playing, "playing")
+			{
+				RequireIsPlugin = true,
+				HelpText = "Lists online players (in the server)."
+			});
 			#endregion AddCommands
 		}
 
 		#region Commands
+		static void Playing(CommandArgs args)
+		{
+			string playing = string.Join(", ", TShock.Players.Where(t => t != null).Select(t => t.Name).ToArray());
+			args.msgEventArgs.Channel.SendMessage($"Currently online players:\n--------------------------\n{playing}", MarkDown.CodeBlock);
+		}
+
 		static void Ping(CommandArgs args)
 		{
-			args.msgEventArgs.Channel.SendMessage("pong");
+			args.msgEventArgs.Channel.SendMessage("pong", MarkDown.CodeLine);
 		}
 
 		static void Bot(CommandArgs args)
 		{
 			if (!args.msgEventArgs.User.ServerPermissions.ManageChannels)
 			{
-				args.msgEventArgs.Channel.SendMessage($"{args.msgEventArgs.User.Name} does not have permission to use {Specifier}bot");
+				args.msgEventArgs.Channel.SendMessage($"{args.msgEventArgs.User.Name} does not have permission to use {Specifier}bot", MarkDown.CodeLine);
 				return;
 			}
 			string option = args.Parameters.Count == 0 ? "help" : args.Parameters[0].ToLower();
@@ -74,30 +85,30 @@ namespace DiscordApp
 			{
 				case "enable":
 					DiscordPlugin.discordBot.Enabled = true;
-					args.msgEventArgs.Channel.SendMessage($"ChooBot is now enabled.");
+					args.msgEventArgs.Channel.SendMessage($"ChooBot is now enabled.", MarkDown.CodeLine);
 					break;
 				case "disable":
 					DiscordPlugin.discordBot.Enabled = false;
-					args.msgEventArgs.Channel.SendMessage($"ChooBot is now disabled.");
+					args.msgEventArgs.Channel.SendMessage($"ChooBot is now disabled.", MarkDown.CodeLine);
 					break;
 				case "restart":
 					ulong channelId = args.msgEventArgs.Channel.Id;
-					args.msgEventArgs.Channel.SendMessage("Restarting ChooBot...");
+					args.msgEventArgs.Channel.SendMessage("Restarting ChooBot...", MarkDown.CodeLine);
 					Task.Run(async () =>
 					{
 						await DiscordPlugin.StartBot();
 					}).ContinueWith(async (o) =>
 					{
-						await DiscordPlugin.discordBot.SendMessage(channelId, "ChooBot restarted successfully.");
+						await DiscordPlugin.discordBot.SendMessage(channelId, "ChooBot restarted successfully.", MarkDown.CodeLine);
 					});
 					break;
 				case "reloadconfig":
 					DiscordPlugin.config = Config.Load();
-					args.msgEventArgs.Channel.SendMessage($"Config file has been reloaded.");
+					args.msgEventArgs.Channel.SendMessage($"Config file has been reloaded.", MarkDown.CodeLine);
 					break;
 				case "help":
 				default:
-					args.msgEventArgs.Channel.SendMessage($"Invalid syntax! proper syntax: {Specifier}bot [enable|disable|restart|reloadconfig]");
+					args.msgEventArgs.Channel.SendMessage($"Invalid syntax! proper syntax: {Specifier}bot [enable|disable|restart|reloadconfig]", MarkDown.CodeLine);
 					break;
 			}
 		}
@@ -110,9 +121,9 @@ namespace DiscordApp
 				if (cmd != null)
 				{
 					if (cmd.CmdInfo != null && cmd.CmdInfo.Count > 0)
-						args.msgEventArgs.Channel.SendMessage($"{Specifier}{cmd.Name}:\n{string.Join("\n", cmd.CmdInfo)}");
+						args.msgEventArgs.Channel.SendMessage($"{Specifier}{cmd.Name}:\n{string.Join("\n", cmd.CmdInfo)}", MarkDown.CodeLine);
 					else
-						args.msgEventArgs.Channel.SendMessage($"No extra help available for {Specifier}{cmd.Name}");
+						args.msgEventArgs.Channel.SendMessage($"No extra help available for {Specifier}{cmd.Name}", MarkDown.CodeLine);
 					return;
 				}
 			}
@@ -121,7 +132,7 @@ namespace DiscordApp
 			{
 				cmdhelp.Add($"{Specifier}{ChatCommands[i].Name} - {ChatCommands[i].HelpText}");
 			}
-			args.msgEventArgs.Channel.SendMessage($"List of commands:\n---------------------\n{string.Join("\n", cmdhelp)}\n---------------------\nType {Specifier}help <command> for more info about a command.");
+			args.msgEventArgs.Channel.SendMessage($"List of commands:\n---------------------\n{string.Join("\n", cmdhelp)}\n---------------------\nType {Specifier}help <command> for more info about a command.", MarkDown.CodeBlock);
 		}
 
 		static void Rnd(CommandArgs args)
@@ -133,14 +144,14 @@ namespace DiscordApp
 			{
 				int.TryParse(args.Parameters[0], out high);
 				rnd = new Random().Next(high);
-				args.msgEventArgs.Channel.SendMessage($"Random number (between 0 and {high}): {rnd}");
+				args.msgEventArgs.Channel.SendMessage($"Random number (between 0 and {high}): {rnd}", MarkDown.CodeLine);
 			}
 			else if (args.Parameters.Count == 2)
 			{
 				int.TryParse(args.Parameters[0], out low);
 				int.TryParse(args.Parameters[1], out high);
 				rnd = new Random().Next(low, high);
-				args.msgEventArgs.Channel.SendMessage($"Random number (between {low} and {high}): {rnd}");
+				args.msgEventArgs.Channel.SendMessage($"Random number (between {low} and {high}): {rnd}", MarkDown.CodeLine);
 			}
 			else
 			{
@@ -154,12 +165,12 @@ namespace DiscordApp
 			args.msgEventArgs.Message.Delete();
 			if (args.Parameters.Count != 2)
 			{
-				args.msgEventArgs.Channel.SendMessage($"Invalid syntax! Proper syntax: {Specifier}login <username> <password>");
+				args.msgEventArgs.Channel.SendMessage($"Invalid syntax! Proper syntax: {Specifier}login <username> <password>", MarkDown.CodeLine);
 				return;
 			}
 			if (!args.msgEventArgs.Channel.IsPrivate)
 			{
-				args.msgEventArgs.Channel.SendMessage($"Only use {Specifier}login in private message you fool!");
+				args.msgEventArgs.Channel.SendMessage($"Only use {Specifier}login in private message you fool!", MarkDown.CodeLine);
 				return;
 			}
 			TShockAPI.DB.User user = TShock.Users.GetUserByName(args.Parameters[0]);
@@ -170,10 +181,10 @@ namespace DiscordApp
 				if (DiscordPlugin.LoggdedInUsers.ContainsKey(args.msgEventArgs.User.Id))
 					DiscordPlugin.LoggdedInUsers.Remove(args.msgEventArgs.User.Id);
 				DiscordPlugin.LoggdedInUsers.Add(args.msgEventArgs.User.Id, ts);
-				args.msgEventArgs.Channel.SendMessage("Logged in successfully!");				
+				args.msgEventArgs.Channel.SendMessage("Logged in successfully!", MarkDown.CodeLine);
 			}
 			else
-				args.msgEventArgs.Channel.SendMessage("Invalid username or password!");
+				args.msgEventArgs.Channel.SendMessage("Invalid username or password!", MarkDown.CodeLine);
 		}
 		#endregion Commands
 
@@ -201,7 +212,7 @@ namespace DiscordApp
 				//player.SendErrorMessage("Invalid command entered. Type {0}help for a list of valid commands.", Specifier);
 				return true;
 			}
-			
+
 			Console.WriteLine("Check 2");
 			foreach (TShockAPI.Command cmd in cmds)
 			{
@@ -243,14 +254,14 @@ namespace DiscordApp
 
 			if (cmds.Count() == 0)
 			{
-				e.Channel.SendMessage($"Invalid command entered. Type {Specifier}help for a list of valid commands.");
+				e.Channel.SendMessage($"Invalid command entered. Type {Specifier}help for a list of valid commands.", MarkDown.CodeLine);
 				return true;
 			}
 			foreach (Command cmd in cmds)
 			{
 				if (!cmd.CanRun(e))
 				{
-					e.Channel.SendMessage("You do not have access to this command.");
+					e.Channel.SendMessage("You do not have access to this command.", MarkDown.CodeLine);
 				}
 				else
 				{

@@ -28,8 +28,8 @@ namespace DiscordApp
 
 		public static Dictionary<ulong, TSPlayer> LoggdedInUsers { get; set; }
 
-		private static int _userId=-2;	
-			
+		private static int _userId = -2;
+
 		public static int UserId
 		{
 			get
@@ -74,15 +74,15 @@ namespace DiscordApp
 		{
 			Task.Run(async () =>
 			{
-				await discordBot.SendMessage(config.ChatChannelId, $"***{TShock.Players[e.Who].Name} has joined.***");
+				await discordBot.SendMessage(config.ChatChannelId, $"{TShock.Players[e.Who].Name} has joined.", MarkDown.BoldItalics);
 			});
-        }
+		}
 
 		void OnLeave(LeaveEventArgs e)
 		{
 			Task.Run(async () =>
 			{
-				await discordBot.SendMessage(config.ChatChannelId, $"***{TShock.Players[e.Who].Name} has left.***");
+				await discordBot.SendMessage(config.ChatChannelId, $"{TShock.Players[e.Who].Name} has left.", MarkDown.BoldItalics);
 			});
 		}
 
@@ -130,12 +130,62 @@ namespace DiscordApp
 				discordBot = null;
 			}
 			discordBot = new DiscordBot(config.ServerId, config.ChatChannelId, config.LogChannelId);
-			await discordBot.Connect(config.BotToken);			
+			await discordBot.Connect(config.BotToken);
+
+			discordBot.Client.MessageReceived += Client_MessageReceived;
 		}
+
+		private static void Client_MessageReceived(object sender, MessageEventArgs e)
+		{
+			if (e.Message.IsAuthor)
+				return;
+
+#if DEBUG
+			Console.WriteLine(e.Message);
+#endif
+			if (e.Message.Text.StartsWith(".") && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
+			{
+				return;
+				if (DiscordPlugin.LoggdedInUsers.ContainsKey(e.User.Id))
+				{
+					TSPlayer ts;
+
+					if (DiscordPlugin.LoggdedInUsers.TryGetValue(e.User.Id, out ts))
+					{
+						Console.WriteLine("tryhandle..");
+						bool success = Commands.HandleTShockCommand(ts, e.Message.Text);
+#if DEBUG
+						Console.WriteLine($"Command executed {(success ? "" : "un")}successfully");
+#endif
+					}
+				}
+				else
+					e.Channel.SendMessage($"You are not logged in!\nPlease private message ChooBot with {Commands.Specifier}login <username> <password> to use TShock commands.");
+				return;
+			}
+			if (e.Message.Text.StartsWith(Commands.Specifier) && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
+			{
+				if (!discordBot.Enabled && e.Message.Text.Substring(1, 3).ToLower() != "bot")
+					return;
+				Commands.HandleCommand(e, e.Message.Text);
+				return;
+			}
+			if (e.Channel.Id == config.ChatChannelId && DiscordPlugin.isPlugin && discordBot.Enabled)
+			{
+				if (e.Message.Text.Length > 500)
+				{
+					e.Message.Delete();
+					return;
+				}
+				TShock.Utils.Broadcast($"[Discord] {e.Message}", DiscordPlugin.config.ChatColor.toColor());
+			}
+		
+	}
 
 		protected override void Dispose(bool disposing)
 		{
 			ServerApi.Hooks.ServerChat.Deregister(this, OnChat);
+			discordBot.Client.MessageReceived -= Client_MessageReceived;
 			base.Dispose(disposing);
 		}
 
@@ -179,94 +229,5 @@ namespace DiscordApp
 			new DiscordPlugin(null).Initialize();
 			Console.ReadLine();
 		}
-	}
-
-	public class DiscordBot : IDisposable
-	{
-		public DiscordBot(ulong ServerId, ulong ChatChannelId, ulong LogChannelId)
-		{
-			this.ServerId = ServerId;
-			this.ChatChannelId = ChatChannelId;
-			this.LogChannelId = LogChannelId;
-		}
-
-		public bool Enabled { get; set; } = true;
-		public DiscordClient Client { get; set; }
-		public ulong ServerId { get; private set; }
-		public ulong ChatChannelId { get; private set; }
-		public ulong LogChannelId { get; private set; }
-		
-
-		public async Task Connect(string token)
-		{
-			Client = new DiscordClient();
-
-			await Client.Connect(token).ContinueWith((o) =>
-			{
-				Client.MessageReceived += Client_MessageReceived;
-				Console.WriteLine("Bot connected to server.");
-			});
-		}
-
-		private void Client_MessageReceived(object sender, MessageEventArgs e)
-		{
-			if (e.Message.IsAuthor)
-				return;
-
-#if DEBUG
-			Console.WriteLine(e.Message);
-#endif
-			if (e.Message.Text.StartsWith(".") && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
-			{
-				return;
-				if (DiscordPlugin.LoggdedInUsers.ContainsKey(e.User.Id))
-				{
-					TSPlayer ts;
-
-					if (DiscordPlugin.LoggdedInUsers.TryGetValue(e.User.Id, out ts))
-					{
-						Console.WriteLine("tryhandle..");
-						bool success = Commands.HandleTShockCommand(ts, e.Message.Text);
-#if DEBUG
-						Console.WriteLine($"Command executed {(success ? "" : "un")}successfully");
-#endif
-					}
-				}
-				else
-					e.Channel.SendMessage($"You are not logged in!\nPlease private message ChooBot with {Commands.Specifier}login <username> <password> to use TShock commands.");
-				return;
-			}
-			if (e.Message.Text.StartsWith(Commands.Specifier) && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
-			{
-				if (!Enabled && e.Message.Text.Substring(1, 3).ToLower() != "bot")
-					return;
-				Commands.HandleCommand(e, e.Message.Text);
-				return;
-			}
-			if (e.Channel.Id == ChatChannelId && DiscordPlugin.isPlugin && Enabled)
-			{
-				if (e.Message.Text.Length > 500)
-				{
-					e.Message.Delete();
-					return;
-				}
-				
-				TShock.Utils.Broadcast($"[Discord] {e.Message}", DiscordPlugin.config.ChatColor.toColor());
-			}
-		}
-
-		public async Task SendMessage(ulong channelId, string message)
-		{
-			if (!Enabled)
-				return;
-
-			await Client.GetServer(ServerId).GetChannel(channelId).SendMessage(message);
-		}
-
-		public void Dispose()
-		{
-			Client.MessageReceived -= Client_MessageReceived;
-			Client = null;
-		}
-	}
+	}	
 }
