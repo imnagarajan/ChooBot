@@ -50,7 +50,8 @@ namespace DiscordApp
 			});
 			add(new Command(Login, "login")
 			{
-				RequireIsPlugin = true
+				RequireIsPlugin = true,
+				HelpText = "Log in on your TShock account."
 			});
 			add(new Command(Playing, "playing")
 			{
@@ -64,7 +65,7 @@ namespace DiscordApp
 		static void Playing(CommandArgs args)
 		{
 			string playing = string.Join(", ", TShock.Players.Where(t => t != null).Select(t => t.Name).ToArray());
-			args.msgEventArgs.Channel.SendMessage($"Currently online players:\n--------------------------\n{playing}", MarkDown.CodeBlock);
+			args.msgEventArgs.Channel.SendMessage($"Currently online players:\n-------------------------\n{playing}", MarkDown.CodeBlock);
 		}
 
 		static void Ping(CommandArgs args)
@@ -156,7 +157,7 @@ namespace DiscordApp
 			else
 			{
 				rnd = new Random().Next();
-				args.msgEventArgs.Channel.SendMessage($"Random number: {rnd}");
+				args.msgEventArgs.Channel.SendMessage($"Random number: {rnd}", MarkDown.CodeLine);
 			}
 		}
 
