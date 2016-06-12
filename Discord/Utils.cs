@@ -11,10 +11,18 @@ namespace DiscordApp
 	{
 		public static void SendMessage(this Channel channel, string message, MarkDown markDown = MarkDown.None)
 		{
-			Task.Run(async()=>
-				{
-					await DiscordPlugin.discordBot.SendMessage(channel.Id, message, markDown);
-				});
+			Task.Run(async () =>
+			{
+				await DiscordPlugin.discordBot.SendMessage(channel.Id, message, markDown);
+			});
+		}
+
+		public static void SendMessage(this User user, string message, MarkDown markDown = MarkDown.None)
+		{
+			Task.Run(async () =>
+			{
+				await DiscordPlugin.discordBot.SendMessage(user, message, markDown);
+			});
 		}
 	}
 }

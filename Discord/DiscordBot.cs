@@ -23,7 +23,6 @@ namespace DiscordApp
 		public ulong ChatChannelId { get; private set; }
 		public ulong LogChannelId { get; private set; }
 
-
 		public async Task Connect(string token)
 		{
 			Client = new DiscordClient();
@@ -32,7 +31,7 @@ namespace DiscordApp
 			{
 				Console.WriteLine("Bot connected to server.");
 			});
-		}	
+		}
 
 		public async Task SendMessage(ulong channelId, string message, MarkDown markDown = MarkDown.None)
 		{
@@ -43,8 +42,39 @@ namespace DiscordApp
 			await Client.GetServer(ServerId).GetChannel(channelId).SendMessage($"{Markdowns[(int)markDown]}{message}{Markdowns[(int)markDown]}");
 		}
 
+		public async Task SendMessage(User user, string message, MarkDown markDown = MarkDown.None)
+		{
+			if (!Enabled)
+				return;
+			string[] Markdowns = { "", "*", "**", "***", "~~", "__", "__*", "__**", "__***", "`", "```" };
+			await user.SendMessage($"{Markdowns[(int)markDown]}{message}{Markdowns[(int)markDown]}");
+		}
+
+		public void Disable(ulong ChannelId)
+		{
+			if (!Enabled)
+				return;
+			
+			Enabled = false;
+			Task.Run(async () =>
+			{
+				await Client.GetServer(ServerId).GetChannel(ChannelId).SendMessage("`Choobot is now disabled.`");
+			});
+		}
+
+		public void Enable(ulong ChannelId)
+		{
+			if (Enabled)
+				return;
+			Enabled = false;
+			Task.Run(async () =>
+			{
+				await Client.GetServer(ServerId).GetChannel(ChannelId).SendMessage("`Choobot is now enabled.`");
+			});
+		}
+
 		public void Dispose()
-		{			
+		{
 			Client = null;
 		}
 	}

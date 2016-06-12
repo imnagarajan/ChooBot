@@ -58,13 +58,34 @@ namespace DiscordApp
 				RequireIsPlugin = true,
 				HelpText = "Lists online players (in the server)."
 			});
+			add(new Command(Staff, "staff")
+			{
+				RequireIsPlugin = true,
+				HelpText = "Lists all online staff members (in the server)."
+			});
 			#endregion AddCommands
 		}
 
 		#region Commands
+		static void Staff(CommandArgs args)
+		{
+			string[] staff = TShock.Players.Where(t => t != null && t.Group.HasPermission("staffchat.staffmember")).OrderBy(t => t.Group.Name).Select(t => t.Group.Prefix + t.Name).ToArray();
+			if (staff.Length == 0)
+			{
+				args.msgEventArgs.Channel.SendMessage("There aren't any staffmembers online at this moment!", MarkDown.CodeLine);
+				return;
+			}
+			string str = $"Currently online staffmembers:\n-----------------------------\n{string.Join("\n", staff)}";
+			args.msgEventArgs.Channel.SendMessage(str, MarkDown.CodeBlock);
+		}
 		static void Playing(CommandArgs args)
 		{
 			string playing = string.Join(", ", TShock.Players.Where(t => t != null).Select(t => t.Name).ToArray());
+			if (string.IsNullOrWhiteSpace(playing))
+			{
+				args.msgEventArgs.Channel.SendMessage("There aren't any players online at this moment!", MarkDown.CodeLine);
+				return;
+			}
 			args.msgEventArgs.Channel.SendMessage($"Currently online players:\n-------------------------\n{playing}", MarkDown.CodeBlock);
 		}
 
@@ -85,12 +106,10 @@ namespace DiscordApp
 			switch (option)
 			{
 				case "enable":
-					DiscordPlugin.discordBot.Enabled = true;
-					args.msgEventArgs.Channel.SendMessage($"ChooBot is now enabled.", MarkDown.CodeLine);
+					DiscordPlugin.discordBot.Enable(args.msgEventArgs.Channel.Id);
 					break;
 				case "disable":
-					DiscordPlugin.discordBot.Enabled = false;
-					args.msgEventArgs.Channel.SendMessage($"ChooBot is now disabled.", MarkDown.CodeLine);
+					DiscordPlugin.discordBot.Disable(args.msgEventArgs.Channel.Id);
 					break;
 				case "restart":
 					ulong channelId = args.msgEventArgs.Channel.Id;
@@ -164,28 +183,26 @@ namespace DiscordApp
 		static void Login(CommandArgs args)
 		{
 			args.msgEventArgs.Message.Delete();
-			if (args.Parameters.Count != 2)
-			{
-				args.msgEventArgs.Channel.SendMessage($"Invalid syntax! Proper syntax: {Specifier}login <username> <password>", MarkDown.CodeLine);
-				return;
-			}
 			if (!args.msgEventArgs.Channel.IsPrivate)
 			{
 				args.msgEventArgs.Channel.SendMessage($"Only use {Specifier}login in private message you fool!", MarkDown.CodeLine);
 				return;
 			}
+			if (args.Parameters.Count != 2)
+			{
+				args.msgEventArgs.User.SendMessage($"Invalid syntax! Proper syntax: {Specifier}login <username> <password>", MarkDown.CodeLine);
+				return;
+			}
 			TShockAPI.DB.User user = TShock.Users.GetUserByName(args.Parameters[0]);
 			if (user != null && user.VerifyPassword(args.Parameters[1]))
 			{
-				Group g = TShock.Groups.GetGroupByName(user.Group);
-				TSPlayer ts = new TSPlayer(DiscordPlugin.UserId) { User = user, Group = g };
 				if (DiscordPlugin.LoggdedInUsers.ContainsKey(args.msgEventArgs.User.Id))
 					DiscordPlugin.LoggdedInUsers.Remove(args.msgEventArgs.User.Id);
-				DiscordPlugin.LoggdedInUsers.Add(args.msgEventArgs.User.Id, ts);
-				args.msgEventArgs.Channel.SendMessage("Logged in successfully!", MarkDown.CodeLine);
+				DiscordPlugin.LoggdedInUsers.Add(args.msgEventArgs.User.Id, user.Name);
+				args.msgEventArgs.User.SendMessage("Logged in successfully!", MarkDown.CodeLine);
 			}
 			else
-				args.msgEventArgs.Channel.SendMessage("Invalid username or password!", MarkDown.CodeLine);
+				args.msgEventArgs.User.SendMessage("Invalid username or password!", MarkDown.CodeLine);
 		}
 		#endregion Commands
 

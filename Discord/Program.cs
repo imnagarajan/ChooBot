@@ -26,7 +26,7 @@ namespace DiscordApp
 		public override string Description => "";
 		public override Version Version => Assembly.GetExecutingAssembly().GetName().Version;
 
-		public static Dictionary<ulong, TSPlayer> LoggdedInUsers { get; set; }
+		public static Dictionary<ulong, string> LoggdedInUsers { get; set; }
 
 		private static int _userId = -2;
 
@@ -59,7 +59,7 @@ namespace DiscordApp
 				await StartBot();
 			});
 
-			LoggdedInUsers = new Dictionary<ulong, TSPlayer>();
+			LoggdedInUsers = new Dictionary<ulong, string>();
 
 			Commands.InitCommands(isPlugin);
 
@@ -95,7 +95,6 @@ namespace DiscordApp
 				case "enable":
 					DiscordPlugin.discordBot.Enabled = true;
 					args.Player.SendInfoMessage($"ChooBot is now enabled.");
-
 					break;
 				case "disable":
 					DiscordPlugin.discordBot.Enabled = false;
@@ -146,7 +145,7 @@ namespace DiscordApp
 			if (e.Message.Text.StartsWith(".") && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
 			{
 				return;
-				if (DiscordPlugin.LoggdedInUsers.ContainsKey(e.User.Id))
+				/*if (DiscordPlugin.LoggdedInUsers.ContainsKey(e.User.Id))
 				{
 					TSPlayer ts;
 
@@ -161,7 +160,7 @@ namespace DiscordApp
 				}
 				else
 					e.Channel.SendMessage($"You are not logged in!\nPlease private message ChooBot with {Commands.Specifier}login <username> <password> to use TShock commands.");
-				return;
+				return;*/
 			}
 			if (e.Message.Text.StartsWith(Commands.Specifier) && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
 			{
@@ -170,17 +169,23 @@ namespace DiscordApp
 				Commands.HandleCommand(e, e.Message.Text);
 				return;
 			}
-			if (e.Channel.Id == config.ChatChannelId && DiscordPlugin.isPlugin && discordBot.Enabled)
+			if (e.Channel.Id == config.ChatChannelId && isPlugin && discordBot.Enabled)
 			{
 				if (e.Message.Text.Length > 500)
 				{
 					e.Message.Delete();
 					return;
 				}
-				TShock.Utils.Broadcast($"[Discord] {e.Message}", DiscordPlugin.config.ChatColor.toColor());
+				if (LoggdedInUsers.ContainsKey(e.User.Id))
+				{
+					string name = LoggdedInUsers[e.User.Id];
+					TShock.Utils.Broadcast($"[Discord] {name}: {e.Message.Text}", config.ChatColor.toColor());
+				}
+				else
+					TShock.Utils.Broadcast($"[Discord] {e.Message}", config.ChatColor.toColor());
 			}
-		
-	}
+
+		}
 
 		protected override void Dispose(bool disposing)
 		{
@@ -209,7 +214,7 @@ namespace DiscordApp
 
 			var text = String.Format(TShock.Config.ChatFormat, tsplr.Group.Name, tsplr.Group.Prefix, tsplr.Name, tsplr.Group.Suffix, e.Text);
 
-			Task.Run(action: async () =>
+			Task.Run(async () =>
 			{
 				await discordBot.SendMessage(config.ChatChannelId, text);
 #if DEBUG
@@ -229,5 +234,5 @@ namespace DiscordApp
 			new DiscordPlugin(null).Initialize();
 			Console.ReadLine();
 		}
-	}	
+	}
 }
