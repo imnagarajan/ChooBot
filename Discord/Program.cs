@@ -54,6 +54,7 @@ namespace DiscordApp
 				config.Save();
 			}
 
+
 			Task.Run(async () =>
 			{
 				await StartBot();
@@ -125,12 +126,12 @@ namespace DiscordApp
 		{
 			if (discordBot != null)
 			{
+				discordBot.Client.MessageReceived -= Client_MessageReceived;
 				discordBot.Dispose();
 				discordBot = null;
 			}
 			discordBot = new DiscordBot(config.ServerId, config.ChatChannelId, config.LogChannelId);
 			await discordBot.Connect(config.BotToken);
-
 			discordBot.Client.MessageReceived += Client_MessageReceived;
 		}
 
@@ -194,9 +195,9 @@ namespace DiscordApp
 			base.Dispose(disposing);
 		}
 
-		public static async void Log(string msg)
+		public static async void Log(string msg, MarkDown markDown = MarkDown.None)
 		{
-			await discordBot.SendMessage(config.LogChannelId, msg);
+			await discordBot.SendMessage(config.LogChannelId, msg, markDown);
 #if DEBUG
 			Console.WriteLine(msg);
 #endif
@@ -204,11 +205,26 @@ namespace DiscordApp
 
 		public void OnChat(ServerChatEventArgs e)
 		{
-			if ((e.Text.StartsWith(TShock.Config.CommandSpecifier) || e.Text.StartsWith(TShock.Config.CommandSilentSpecifier)) && !string.IsNullOrWhiteSpace(e.Text.Substring(1)))
-				return;
-
 			var tsplr = TShock.Players[e.Who];
-
+			if (e.Text.StartsWith("/me") && e.Text.Length > 4)
+			{
+				Task.Run(async () =>
+				{
+					await discordBot.SendMessage(config.ChatChannelId, $"*{tsplr.Name} {e.Text.Substring(4).TrimEnd()}", MarkDown.Italics);
+				});
+				return;
+			}
+			if ((e.Text.StartsWith(TShock.Config.CommandSpecifier) || e.Text.StartsWith(TShock.Config.CommandSilentSpecifier)) && !string.IsNullOrWhiteSpace(e.Text.Substring(1)))
+			{
+				if (e.Text.StartsWith($"{TShock.Config.CommandSpecifier}login") || e.Text.StartsWith($"{TShock.Config.CommandSpecifier}password") || e.Text.StartsWith($"{TShock.Config.CommandSpecifier}register"))
+					return;
+				
+				if (e.Text.StartsWith($"{TShock.Config.CommandSpecifier}user") || e.Text.StartsWith($"{TShock.Config.CommandSpecifier}group")  || e.Text.StartsWith("//"))
+					Log($"{tsplr.Name} executed: {e.Text}", MarkDown.Bold);
+				else
+					Log($"{tsplr.Name} executed: {e.Text}");
+				return;
+			}
 			if (!tsplr.HasPermission(Permissions.canchat))
 				return;
 

@@ -54,7 +54,7 @@ namespace DiscordApp
 		{
 			if (!Enabled)
 				return;
-			
+
 			Enabled = false;
 			Task.Run(async () =>
 			{
@@ -78,8 +78,6 @@ namespace DiscordApp
 			Client = null;
 		}
 	}
-
-
 
 	public enum MarkDown
 	{
