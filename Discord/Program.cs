@@ -148,6 +148,8 @@ namespace DiscordApp
 
 					TShockAPI.Commands.HandleCommand(tsd, e.Message.Text);
 
+					Log($"{tsd.Name} executed: !{e.Message.Text}");
+
 					string msg = string.Join("\n", tsd.GetCommandOutput());
 
 					if (!string.IsNullOrEmpty(msg))
