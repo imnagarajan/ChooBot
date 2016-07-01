@@ -26,7 +26,7 @@ namespace DiscordApp
 		public override string Description => "";
 		public override Version Version => Assembly.GetExecutingAssembly().GetName().Version;
 
-		public static Dictionary<ulong, string> LoggdedInUsers { get; set; }
+		public static Dictionary<ulong, TSDiscordPlayer> LoggdedInUsers { get; set; }
 
 		private static int _userId = -2;
 
@@ -60,7 +60,7 @@ namespace DiscordApp
 				await StartBot();
 			});
 
-			LoggdedInUsers = new Dictionary<ulong, string>();
+			LoggdedInUsers = new Dictionary<ulong, TSDiscordPlayer>();
 
 			Commands.InitCommands(isPlugin);
 
@@ -140,28 +140,22 @@ namespace DiscordApp
 			if (e.Message.IsAuthor)
 				return;
 
-#if DEBUG
-			Console.WriteLine(e.Message);
-#endif
 			if (e.Message.Text.StartsWith(".") && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
 			{
-				return;
-				/*if (DiscordPlugin.LoggdedInUsers.ContainsKey(e.User.Id))
+				if (LoggdedInUsers.ContainsKey(e.User.Id))
 				{
-					TSPlayer ts;
+					TSDiscordPlayer tsd = LoggdedInUsers[e.User.Id];
 
-					if (DiscordPlugin.LoggdedInUsers.TryGetValue(e.User.Id, out ts))
-					{
-						Console.WriteLine("tryhandle..");
-						bool success = Commands.HandleTShockCommand(ts, e.Message.Text);
-#if DEBUG
-						Console.WriteLine($"Command executed {(success ? "" : "un")}successfully");
-#endif
-					}
+					TShockAPI.Commands.HandleCommand(tsd, e.Message.Text);
+
+					string msg = string.Join("\n", tsd.GetCommandOutput());
+
+					if (!string.IsNullOrEmpty(msg))
+						e.Channel.SendMessage(msg, MarkDown.CodeBlock);
 				}
 				else
-					e.Channel.SendMessage($"You are not logged in!\nPlease private message ChooBot with {Commands.Specifier}login <username> <password> to use TShock commands.");
-				return;*/
+					e.Channel.SendMessage($"You are not logged in!\nPlease private message ChooBot with {Commands.Specifier}login <username> <password> to use TShock commands.", MarkDown.CodeBlock);
+				return;
 			}
 			if (e.Message.Text.StartsWith(Commands.Specifier) && !string.IsNullOrWhiteSpace(e.Message.Text.Substring(1)))
 			{
@@ -179,7 +173,7 @@ namespace DiscordApp
 				}
 				if (LoggdedInUsers.ContainsKey(e.User.Id))
 				{
-					string name = LoggdedInUsers[e.User.Id];
+					string name = LoggdedInUsers[e.User.Id].Name;
 					TShock.Utils.Broadcast($"[Discord] {name}: {e.Message.Text}", config.ChatColor.toColor());
 				}
 				else
@@ -218,8 +212,8 @@ namespace DiscordApp
 			{
 				if (e.Text.StartsWith($"{TShock.Config.CommandSpecifier}login") || e.Text.StartsWith($"{TShock.Config.CommandSpecifier}password") || e.Text.StartsWith($"{TShock.Config.CommandSpecifier}register"))
 					return;
-				
-				if (e.Text.StartsWith($"{TShock.Config.CommandSpecifier}user") || e.Text.StartsWith($"{TShock.Config.CommandSpecifier}group")  || e.Text.StartsWith("//"))
+
+				if (e.Text.StartsWith($"{TShock.Config.CommandSpecifier}user") || e.Text.StartsWith($"{TShock.Config.CommandSpecifier}group") || e.Text.StartsWith("//"))
 					Log($"{tsplr.Name} executed: {e.Text}", MarkDown.Bold);
 				else
 					Log($"{tsplr.Name} executed: {e.Text}");

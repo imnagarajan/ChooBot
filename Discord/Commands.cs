@@ -180,6 +180,17 @@ namespace DiscordApp
 			}
 		}
 
+		static void Logout(CommandArgs args)
+		{
+			if (!DiscordPlugin.LoggdedInUsers.ContainsKey(args.msgEventArgs.User.Id))
+			{
+				args.msgEventArgs.User.SendMessage("You are not logged in!", MarkDown.CodeLine);
+				return;
+			}
+			DiscordPlugin.LoggdedInUsers.Remove(args.msgEventArgs.User.Id);
+			args.msgEventArgs.User.SendMessage("You are now logged out.", MarkDown.CodeLine);
+		}
+
 		static void Login(CommandArgs args)
 		{
 			args.msgEventArgs.Message.Delete();
@@ -196,65 +207,15 @@ namespace DiscordApp
 			TShockAPI.DB.User user = TShock.Users.GetUserByName(args.Parameters[0]);
 			if (user != null && user.VerifyPassword(args.Parameters[1]))
 			{
-				if (DiscordPlugin.LoggdedInUsers.ContainsKey(args.msgEventArgs.User.Id))
-					DiscordPlugin.LoggdedInUsers.Remove(args.msgEventArgs.User.Id);
-				DiscordPlugin.LoggdedInUsers.Add(args.msgEventArgs.User.Id, user.Name);
-				args.msgEventArgs.User.SendMessage("Logged in successfully!", MarkDown.CodeLine);
+					if (DiscordPlugin.LoggdedInUsers.ContainsKey(args.msgEventArgs.User.Id))
+						DiscordPlugin.LoggdedInUsers.Remove(args.msgEventArgs.User.Id);
+					DiscordPlugin.LoggdedInUsers.Add(args.msgEventArgs.User.Id, new TSDiscordPlayer(user.Name, TShock.Groups.GetGroupByName(user.Group)));
+					args.msgEventArgs.User.SendMessage("Logged in successfully!", MarkDown.CodeLine);
 			}
 			else
 				args.msgEventArgs.User.SendMessage("Invalid username or password!", MarkDown.CodeLine);
 		}
 		#endregion Commands
-
-		public static bool HandleTShockCommand(TSPlayer player, string text)
-		{
-			string cmdText = text.Remove(0, 1);
-			string cmdPrefix = text[0].ToString();
-			bool silent = false;
-
-			if (cmdPrefix == TShockAPI.Commands.SilentSpecifier)
-				silent = true;
-
-			var args = ParseParameters(cmdText);
-			if (args.Count < 1)
-				return false;
-
-			string cmdName = args[0].ToLower();
-			args.RemoveAt(0);
-
-			IEnumerable<TShockAPI.Command> cmds = TShockAPI.Commands.ChatCommands.FindAll(c => c.HasAlias(cmdName));
-			Console.WriteLine("Check 1");
-			if (cmds.Count() == 0)
-			{
-
-				//player.SendErrorMessage("Invalid command entered. Type {0}help for a list of valid commands.", Specifier);
-				return true;
-			}
-
-			Console.WriteLine("Check 2");
-			foreach (TShockAPI.Command cmd in cmds)
-			{
-				if (!cmd.CanRun(player))
-				{
-					Console.WriteLine("Check 3");
-					TShock.Utils.SendLogs(string.Format("{0} tried to execute {1}{2}.", player.Name, Specifier, cmdText), Color.PaleVioletRed, player);
-					player.SendErrorMessage("You do not have access to this command.");
-				}
-				else if (!cmd.AllowServer && !player.RealPlayer)
-				{
-					Console.WriteLine("Check 4");
-					player.SendErrorMessage("You must use this command in-game.");
-				}
-				else
-				{
-					Console.WriteLine("Check 5");
-					if (cmd.DoLog)
-						TShock.Utils.SendLogs(string.Format("{0} executed: {1}{2}.", player.Name, silent ? TShockAPI.Commands.SilentSpecifier : TShockAPI.Commands.Specifier, cmdText), Color.PaleVioletRed, player);
-					cmd.Run(cmdText, silent, player, args);
-				}
-			}
-			return true;
-		}
 
 		public static bool HandleCommand(MessageEventArgs e, string text)
 		{
