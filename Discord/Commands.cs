@@ -209,7 +209,7 @@ namespace DiscordApp
 			{
 					if (DiscordPlugin.LoggdedInUsers.ContainsKey(args.msgEventArgs.User.Id))
 						DiscordPlugin.LoggdedInUsers.Remove(args.msgEventArgs.User.Id);
-					DiscordPlugin.LoggdedInUsers.Add(args.msgEventArgs.User.Id, new TSDiscordPlayer(user.Name, TShock.Groups.GetGroupByName(user.Group)));
+					DiscordPlugin.LoggdedInUsers.Add(args.msgEventArgs.User.Id, new TSDiscordPlayer(user.Name, TShock.Groups.GetGroupByName(user.Group)) { User = user });
 					args.msgEventArgs.User.SendMessage("Logged in successfully!", MarkDown.CodeLine);
 			}
 			else
