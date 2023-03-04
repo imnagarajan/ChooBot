@@ -13,7 +13,7 @@ using System.IO;
 
 namespace DiscordApp
 {
-	[ApiVersion(1, 23)]
+	[ApiVersion(2, 1)]
 	public class DiscordPlugin : TerrariaPlugin
 	{
 		public static bool isPlugin = true;
